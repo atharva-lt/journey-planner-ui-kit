@@ -1,77 +1,30 @@
+
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Loader } from 'lucide-react';
+import { Loader } from 'lucide-react';
 
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import ItineraryResult from './ItineraryResult';
+
 import { generateItinerary } from '@/services/travelApi';
+import { currencies, accommodationTypes } from '@/lib/form-constants';
+import { travelFormSchema, TravelFormValues } from '@/lib/form-schemas';
+import DatePickerField from './form/DatePickerField';
+import PreferencesField from './form/PreferencesField';
+import ItineraryResult from './ItineraryResult';
 
-const currencies = [
-  { value: 'USD', label: 'USD (US Dollar)' },
-  { value: 'EUR', label: 'EUR (Euro)' },
-  { value: 'GBP', label: 'GBP (British Pound)' },
-  { value: 'INR', label: 'INR (Indian Rupee)' },
-  { value: 'AUD', label: 'AUD (Australian Dollar)' },
-  { value: 'CAD', label: 'CAD (Canadian Dollar)' },
-  { value: 'JPY', label: 'JPY (Japanese Yen)' },
-];
-
-const accommodationTypes = [
-  { value: 'hotel', label: 'Hotel' },
-  { value: 'hostel', label: 'Hostel' },
-  { value: 'airbnb', label: 'Airbnb' },
-  { value: 'resort', label: 'Resort' },
-];
-
-const travelPreferences = [
-  { value: 'adventure', label: 'Adventure' },
-  { value: 'relaxation', label: 'Relaxation' },
-  { value: 'culture', label: 'Culture' },
-  { value: 'nature', label: 'Nature' },
-  { value: 'luxury', label: 'Luxury' },
-  { value: 'budget', label: 'Budget' },
-  { value: 'family', label: 'Family' },
-  { value: 'romantic', label: 'Romantic' },
-  { value: 'food', label: 'Food & Dining' },
-  { value: 'nightlife', label: 'Nightlife' },
-  { value: 'shopping', label: 'Shopping' },
-];
-
-const formSchema = z.object({
-  destination: z.string().min(2, { message: 'Destination must be at least 2 characters' }),
-  startDate: z.date({ required_error: 'Start date is required' }),
-  endDate: z.date({ required_error: 'End date is required' }),
-  groupSize: z.coerce.number().min(1, { message: 'Group size must be at least 1' }),
-  budgetAmount: z.coerce.number().min(1, { message: 'Budget amount must be at least 1' }),
-  budgetCurrency: z.string({ required_error: 'Please select a currency' }),
-  accommodation: z.string({ required_error: 'Please select an accommodation type' }),
-  preferences: z.array(z.string()).min(1, { message: 'Select at least one preference' }),
-  notes: z.string().optional(),
-}).refine(data => data.endDate > data.startDate, {
-  message: "End date must be after start date",
-  path: ["endDate"],
-});
-
-type FormValues = z.infer<typeof formSchema>;
-
-const TravelForm: React.FC = () => {
+const TravelForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [itinerary, setItinerary] = useState<string | null>(null);
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<TravelFormValues>({
+    resolver: zodResolver(travelFormSchema),
     defaultValues: {
       destination: '',
       groupSize: 2,
@@ -83,7 +36,7 @@ const TravelForm: React.FC = () => {
     },
   });
 
-  const onSubmit = async (data: FormValues) => {
+  const onSubmit = async (data: TravelFormValues) => {
     try {
       setIsLoading(true);
       setItinerary(null);
@@ -111,15 +64,6 @@ const TravelForm: React.FC = () => {
     }
   };
 
-  const togglePreference = (value: string) => {
-    const currentPreferences = form.getValues('preferences');
-    const updatedPreferences = currentPreferences.includes(value)
-      ? currentPreferences.filter(pref => pref !== value)
-      : [...currentPreferences, value];
-    
-    form.setValue('preferences', updatedPreferences, { shouldValidate: true });
-  };
-
   return (
     <div className="w-full max-w-4xl mx-auto">
       <Form {...form}>
@@ -141,89 +85,17 @@ const TravelForm: React.FC = () => {
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="startDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Start Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Select date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) => date < new Date()}
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
+            <DatePickerField 
+              form={form} 
+              name="startDate" 
+              label="Start Date" 
             />
 
-            <FormField
-              control={form.control}
-              name="endDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>End Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Select date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value}
-                        onSelect={field.onChange}
-                        disabled={(date) => 
-                          date < new Date() || 
-                          (form.getValues('startDate') && date < form.getValues('startDate'))
-                        }
-                        initialFocus
-                        className="pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
+            <DatePickerField 
+              form={form} 
+              name="endDate" 
+              label="End Date" 
+              minDate={form.getValues('startDate')}
             />
 
             <FormField
@@ -306,36 +178,7 @@ const TravelForm: React.FC = () => {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="preferences"
-              render={() => (
-                <FormItem className="md:col-span-2">
-                  <FormLabel>Travel Preferences</FormLabel>
-                  <FormControl>
-                    <div className="flex flex-wrap gap-2">
-                      {travelPreferences.map((pref) => {
-                        const isSelected = form.getValues('preferences').includes(pref.value);
-                        return (
-                          <Badge
-                            key={pref.value}
-                            variant={isSelected ? "default" : "outline"}
-                            className={cn(
-                              "cursor-pointer hover:bg-muted-foreground/10",
-                              isSelected && "bg-travel-500 hover:bg-travel-600"
-                            )}
-                            onClick={() => togglePreference(pref.value)}
-                          >
-                            {pref.label}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <PreferencesField form={form} />
 
             <FormField
               control={form.control}
