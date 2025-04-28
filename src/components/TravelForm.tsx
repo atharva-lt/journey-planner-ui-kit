@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ItineraryResult from './ItineraryResult';
+import { generateItinerary } from '@/services/travelApi';
 
 const currencies = [
   { value: 'USD', label: 'USD (US Dollar)' },
@@ -49,52 +49,6 @@ const travelPreferences = [
   { value: 'shopping', label: 'Shopping' },
 ];
 
-// This simulates the API call
-const generateItinerary = async (data: FormValues): Promise<string> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-  
-  // Return a mock response based on the form data
-  return `
-# ${data.destination} Itinerary
-## ${format(data.startDate, 'MMM d')} - ${format(data.endDate, 'MMM d, yyyy')}
-
-### Trip Overview
-- **Destination:** ${data.destination}
-- **Duration:** ${Math.ceil((data.endDate.getTime() - data.startDate.getTime()) / (1000 * 60 * 60 * 24))} days
-- **Group Size:** ${data.groupSize} people
-- **Budget:** ${data.budgetAmount} ${data.budgetCurrency}
-- **Accommodation:** ${data.accommodation}
-
-### Daily Plan
-
-#### Day 1 - Arrival & Settling In
-- Morning: Arrival at ${data.destination} airport
-- Afternoon: Check-in at your ${data.accommodation.toLowerCase()}
-- Evening: Welcome dinner at a local restaurant
-
-#### Day 2 - Exploring ${data.destination}
-- Morning: Visit to the main attractions
-- Afternoon: ${data.preferences.includes('culture') ? 'Museum tour' : 'Leisure time'}
-- Evening: ${data.preferences.includes('nightlife') ? 'Experience local nightlife' : 'Relax at accommodation'}
-
-#### Day 3 - Adventure Day
-- Full day: ${data.preferences.includes('adventure') ? 'Hiking and outdoor activities' : 'City tour and shopping'}
-- Evening: ${data.preferences.includes('food') ? 'Cooking class with local cuisine' : 'Dinner at recommended restaurant'}
-
-### Recommendations
-Based on your preferences (${data.preferences.join(', ')}), we suggest:
-- ${data.preferences.includes('nature') ? 'Visit the national park outside the city' : 'Take a guided city tour'}
-- ${data.preferences.includes('luxury') ? 'Book a spa day at a 5-star hotel' : 'Explore local markets'}
-- ${data.preferences.includes('budget') ? 'Use public transportation to save money' : 'Rent a car for convenience'}
-
-${data.notes ? `### Additional Notes\n${data.notes}` : ''}
-
-Enjoy your trip to ${data.destination}!
-  `;
-};
-
-// Define the form schema with Zod
 const formSchema = z.object({
   destination: z.string().min(2, { message: 'Destination must be at least 2 characters' }),
   startDate: z.date({ required_error: 'Start date is required' }),
@@ -134,19 +88,29 @@ const TravelForm: React.FC = () => {
       setIsLoading(true);
       setItinerary(null);
       
-      const result = await generateItinerary(data);
-      
+      const formattedData = {
+        destination: data.destination,
+        start_date: format(data.startDate, 'yyyy-MM-dd'),
+        end_date: format(data.endDate, 'yyyy-MM-dd'),
+        group_size: data.groupSize,
+        budget_amount: data.budgetAmount,
+        currency: data.budgetCurrency,
+        accommodation_preference: data.accommodation,
+        travel_preferences: data.preferences,
+        additional_notes: data.notes
+      };
+
+      const result = await generateItinerary(formattedData);
       setItinerary(result);
       toast.success('Itinerary generated successfully!');
     } catch (error) {
       console.error('Error generating itinerary:', error);
-      toast.error('Failed to generate itinerary. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to generate itinerary. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handler for adding/removing preferences
   const togglePreference = (value: string) => {
     const currentPreferences = form.getValues('preferences');
     const updatedPreferences = currentPreferences.includes(value)
