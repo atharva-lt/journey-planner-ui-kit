@@ -1,4 +1,6 @@
 
+import { supabase } from "@/integrations/supabase/client";
+
 interface TravelFormData {
   destination: string;
   start_date: string;
@@ -12,17 +14,10 @@ interface TravelFormData {
 }
 
 export async function generateItinerary(formData: TravelFormData): Promise<string> {
-  const API_URL = 'https://api.langflow.astra.datastax.com/lf/fe006637-75ba-4934-a97e-eaa0753cc574/api/v1/run/356caed8-e536-47f0-8046-XXXX';
-  const API_KEY = 'AstraCS:kzIHnuCiopRfjsDeJYFxXZeQ:adbfc7181eaa8012ddb3616fe0f030ac94dc9971574efcba4ebeb2920354474d';
-
   try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    // Call our Supabase Edge Function instead of the Langflow API directly
+    const { data, error } = await supabase.functions.invoke('proxy', {
+      body: {
         input_value: {
           destination: formData.destination,
           start_date: formData.start_date,
@@ -34,15 +29,16 @@ export async function generateItinerary(formData: TravelFormData): Promise<strin
           travel_preferences: formData.travel_preferences,
           additional_notes: formData.additional_notes || ''
         }
-      })
+      }
     });
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+    if (error) {
+      console.error('Proxy function error:', error);
+      throw new Error(`API Error: ${error.message}`);
     }
 
-    const data = await response.json();
-    return data.result || data.text || 'No itinerary generated';
+    // The Supabase function returns the data from Langflow API
+    return data?.result || data?.text || 'No itinerary generated';
   } catch (error) {
     console.error('Failed to generate itinerary:', error);
     throw new Error('Failed to generate itinerary. Please try again.');
